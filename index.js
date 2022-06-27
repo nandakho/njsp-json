@@ -6,7 +6,7 @@ var java=null,
 	temp = require('temp'),
 	async = require('async');
 
-var defaults = {reports:{}, drivers:{}, conns:{}, tmpPath: '/tmp'};
+var defaults = {reports:{}, tmpPath: '/tmp'};
 
 function walk(dir, done) {
   var results = [];
@@ -33,57 +33,20 @@ function walk(dir, done) {
 
 /*
  * options: {
- * 	path: , //Path to jasperreports-x.x.x-project directory
- *  tmpPath: '/tmp', // Path to a folder for storing compiled report files
+ * 	path: , //Path to jasperreports-x.x.x-project directory - required
  * 	reports: {
- * 		// Report Definition
- * 		"name": {
+ * 		//Report Definition
+ * 		name: { //Report's name
  * 			jasper: , //Path to jasper file,
- * 			jrxml: , //Path to jrxml file,
- * 			conn: , //Connection name, definition object or false (if false defaultConn won't apply)
+ * 			jrxml: //Path to jrxml file
  * 		}
  * 	},
- * 	drivers: {
- *		// Driver Definition
- * 		"name": {
- 			path: , //Path to jdbc driver jar
- 			class: , //Class name of the driver (what you would tipically place in "Class.forName()" in java)
- 			type: //Type of database (mysql, postgres)
- 		}
- * 	},
- * 	conns: {
- *		// Connection Definition
- * 		"name": {
- * 			host: , //Database hostname or IP
- * 			port: , //Database Port
- * 			dbname: , //Database Name
- * 			user: , //User Name
- * 			pass: , //User Password
- * 			jdbc: , //jdbc connection string
- *			driver: //name or definition of the driver for this conn
- * 		}
- *	},
- *	defaultConn: , //Default Connection name
-	java: //Array of java options, for example ["-Djava.awt.headless=true"]
+ *  tmpPath: '/tmp', // Path to a folder for storing compiled report files, default is used if not provided
  * }
  */
 function jasper(options) {
-	if(options.javaInstance) {
-		java = options.javaInstance
-	} else {
-		java = require('java')
-	}
+	java = require('java');
 	this.java = java;
-	if(options.java) {
-		if(util.isArray(options.java)) {
-			options.java.forEach(function(javaOption) {
-				java.options.push(javaOption);
-			});
-		}
-		if(typeof options.java == 'string') {
-			java.options.push(options.java);
-		}
-	}
 	var self = this;
 	self.parentPath = path.dirname(module.parent.filename);
 	var jrPath = path.resolve(self.parentPath, options.path||'.');
@@ -117,11 +80,6 @@ function jasper(options) {
 		},
 		dirverJars: function(cb) {
 			var results = [];
-			if(options.drivers) {
-				for(var i in options.drivers) {
-					results.push(path.resolve(self.parentPath, options.drivers[i].path));
-				}
-			}
 			cb(null, results);
 		},
 		loadJars: ['jrJars', 'dirverJars', function(cb, jars) {
@@ -136,39 +94,15 @@ function jasper(options) {
 			if(!options.debug) options.debug = 'off';
 			var levels = ['ALL', 'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'OFF'];
 			if(levels.indexOf((options.debug+'').toUpperCase()) == -1) options.debug = 'DEBUG';
-
-			/*
-			commented because in java 1.8 this causes
-
-			#
-			# A fatal error has been detected by the Java Runtime Environment:
-			#
-			#  SIGSEGV (0xb) at pc=0x00007f5caeacbac2, pid=7, tid=0x00007f5caf3c8ae8
-			#
-			# JRE version: OpenJDK Runtime Environment (8.0_181-b13) (build 1.8.0_181-b13)
-			# Java VM: OpenJDK 64-Bit Server VM (25.181-b13 mixed mode linux-amd64 compressed oops)
-			# Derivative: IcedTea 3.9.0
-			# Distribution: Custom build (Tue Oct 23 12:48:04 GMT 2018)
-			# Problematic frame:
-			# C  [nodejavabridge_bindings.node+0x20ac2]  javaGetEnv(JavaVM_*, _jobject*)+0xa2
-			*/
-
-			/*
-			var appender  = java.newInstanceSync('org.apache.log4j.ConsoleAppender');
-			var pattern = java.newInstanceSync('org.apache.log4j.PatternLayout', "%d [%p|%c|%C{1}] %m%n");
-			appender.setLayout(pattern);
-			appender.setThreshold(java.getStaticFieldValue("org.apache.log4j.Level", (options.debug+'').toUpperCase()));
-			appender.activateOptions();
-			var root = java.callStaticMethodSync("org.apache.log4j.Logger", "getRootLogger");
-			root.addAppender(appender);
-			*/
+			// Multi type export support - nandakho
+			self.SimpleExporterInput = java.import('net.sf.jasperreports.export.SimpleExporterInput');
+			self.JRXlsxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter');
+			self.JRDocxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRDocxExporter');
+			self.JRPptxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRPptxExporter');
+			self.SimpleOutputStreamExporterOutput = java.import('net.sf.jasperreports.export.SimpleOutputStreamExporterOutput');
 			cb();
 		}],
 		loadClass: ['loadJars', function(cb) {
-			var cl = java.callStaticMethodSync("java.lang.ClassLoader","getSystemClassLoader")
-			for(var i in options.drivers) {
-				cl.loadClassSync(options.drivers[i].class).newInstanceSync();
-			}
 			cb();
 		}],
 		imports: ['loadClass', function(cb) {
@@ -181,10 +115,8 @@ function jasper(options) {
 			self.jfm = java.import('net.sf.jasperreports.engine.JasperFillManager');
 			self.jem = java.import('net.sf.jasperreports.engine.JasperExportManager');
 			self.loc = java.import('java.util.Locale');
-
 			cb();
 		}]
-
 	}, function() {
 	    if(self.ready) {
 	        self.ready();
@@ -200,42 +132,47 @@ jasper.prototype.ready = function(f) {
     self.ready = f;
 };
 
-/*
- * name = Report Name
- * def = Report Definition
- */
 jasper.prototype.add = function(name, def) {
 	this.reports[name] = def;
 }
 
-jasper.prototype.pdf = function(report) {
-  return this.export(report, 'pdf');
+// Multi type export support - nandakho
+jasper.prototype.html = function(report) {
+  	return this.export(report, 'html');
 }
 
-/*
- * report can be of any of the following types:
- * _ A string that represents report's name. No data is supplied.. defaultConn will be applied to get data with reports internal query.
- * _ An object that represents report's definition. No data is supplied.. defaultConn will be applied to get data with reports internal query.
- * _ An object that represents reports, data and properties to override for this specific method call.
- *
+jasper.prototype.xls = function(report) {
+	return this.export(report, 'xls');
+}
+
+jasper.prototype.doc = function(report) {
+	return this.export(report, 'doc');
+}
+
+jasper.prototype.ppt = function(report) {
+	return this.export(report, 'ppt');
+}
+
+jasper.prototype.pdf = function(report) {
+	return this.export(report, 'pdf');
+}
+
+/*	
+ * Report is an object that represents reports, data and properties to override for this specific method call:
  * 	{
  * 		report: , //name, definition or an array with any combination of both
  * 		data: {}, //Data to be applied to the report. If there is an array of reports, data will be applied to each.
- * 		override: {} //properties of report to override for this specific method call.
+ * 		override: {}, //properties of report to override for this specific method call.
+ * 		dataset: {}, //JSON Data
+ * 		query: '' // string to pass to jasperreports to query on the dataset
  * 	}
  * _ An array with any combination of the three posibilities described before.
  * _ A function returning any combination of the four posibilities described before.
  */
-
-var validConnections = {};
 jasper.prototype.export = function(report, type) {
-
 	var self = this;
-
 	if(!type) return;
-
 	type = type.charAt(0).toUpperCase()+type.toLowerCase().slice(1);
-
 	var processReport = function(report) {
 		if(typeof report == 'string') {
 			return [extend({},self.reports[report])];
@@ -265,51 +202,22 @@ jasper.prototype.export = function(report, type) {
 		}
 	};
 
-	var processConn = function(conn, item) {
-		if(conn == 'in_memory_json') {
-			var jsonString = JSON.stringify(item.dataset);
-
-			var byteArray = [];
-			var buffer = Buffer(jsonString);
-			for (var i = 0; i < buffer.length; i++) {
-				byteArray.push(buffer[i]);
-			}
-			byteArray = java.newArray('byte', byteArray);
-
-			return new self.jrjsonef(new self.jbais(byteArray), item.query || '');
-		}else if(typeof conn == 'string') {
-			conn = self.conns[conn];
-		} else if (typeof conn == 'function') {
-			conn = conn();
-		} else if(conn !== false && self.defaultConn) {
-			conn = self.conns[self.defaultConn];
+	var processConn = function(item) {
+		var jsonString = JSON.stringify(item.dataset);
+		var byteArray = [];
+		var buffer = Buffer(jsonString);
+		for (var i = 0; i < buffer.length; i++) {
+			byteArray.push(buffer[i]);
 		}
-
-		if(conn) {
-			if(typeof conn.driver == 'string') {
-				conn.driver = self.drivers[conn.driver];
-			}
-			var connStr = conn.jdbc?conn.jdbc:'jdbc:'+conn.driver.type+'://'+conn.host+':'+conn.port+'/'+conn.dbname;
-
-			if(!validConnections[connStr] || !validConnections[connStr].isValidSync(conn.validationTimeout || 1)){
-				validConnections[connStr] = self.dm.getConnectionSync(connStr, conn.user, conn.pass);
-			}
-			return validConnections[connStr];
-		} else {
-
-			return new self.jreds();
-
-		}
-
+		byteArray = java.newArray('byte', byteArray);
+		return new self.jrjsonef(new self.jbais(byteArray), item.query || '');
 	};
 
 	var parseLocale = function (localeString) {
 		var tokens = localeString.split(/[_|-]/);
-
 		if (tokens.length > 1) {
 			return self.loc(tokens[0], tokens[1]);
-		}
-		else {
+		} else {
 			return self.loc(tokens[0]);
 		}
 	}
@@ -320,7 +228,6 @@ jasper.prototype.export = function(report, type) {
 		if(!item.jasper && item.jrxml) {
 			item.jasper = self.compileSync(item.jrxml, self.tmpPath);
 		}
-
 		if(item.jasper) {
 			var data = null;
 			if(item.data) {
@@ -332,12 +239,12 @@ jasper.prototype.export = function(report, type) {
 					data.putSync(j, item.data[j])
 				}
 			}
-
-			var conn = processConn(item.conn, item);
+			var conn = processConn(item);
 			var p = self.jfm.fillReportSync(path.resolve(self.parentPath,item.jasper), data, conn);
 			prints.push(p);
 		}
 	});
+
 	if(prints.length) {
 		var master = prints.shift();
 		prints.forEach(function(p) {
@@ -346,8 +253,37 @@ jasper.prototype.export = function(report, type) {
 				master.addPageSync(p.getPagesSync().getSync(j));
 			}
 		});
-		var tempName = temp.path({suffix: '.pdf'});
-		self.jem['exportReportTo'+type+'FileSync'](master, tempName);
+		// Multi type export support - nandakho
+		var tempName = temp.path({suffix: '.tmp'});
+		switch(type){
+			case 'Html':
+				self.jem['exportReportToHtmlFileSync'](master, tempName);
+				var exp = fs.readFileSync(tempName);
+				fs.unlinkSync(tempName);
+				return exp;
+			case 'Ppt':
+			case 'Pptx':
+				var exporter = new self.JRPptxExporter();
+				break
+			case 'Doc':
+			case 'Docx':
+				var exporter = new self.JRDocxExporter();
+				break;
+			case 'Xls':
+			case 'Xlsx':
+				var exporter = new self.JRXlsxExporter();
+				break
+			case 'Pdf':
+				self.jem['exportReportToPdfFileSync'](master, tempName);
+				var exp = fs.readFileSync(tempName);
+				fs.unlinkSync(tempName);
+				return exp;
+			default:
+				return '';
+		}
+		exporter.setExporterInputSync(new self.SimpleExporterInput(master));
+		exporter.setExporterOutputSync(new self.SimpleOutputStreamExporterOutput(tempName));
+		exporter.exportReportSync();
 		var exp = fs.readFileSync(tempName);
 		fs.unlinkSync(tempName);
 		return exp;
