@@ -45,7 +45,7 @@ function walk(dir, done) {
  * }
  */
 function jasper(options) {
-	java = require('java');
+	java = require('el-java');
 	this.java = java;
 	var self = this;
 	self.parentPath = path.dirname(module.parent.filename);
