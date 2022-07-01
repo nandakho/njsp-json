@@ -6,7 +6,7 @@ var java=null,
 	temp = require('temp'),
 	async = require('async');
 
-var defaults = {reports:{}, tmpPath: '/tmp'};
+var defaults = {reports:{}};
 
 function walk(dir, done) {
   var results = [];
@@ -33,15 +33,14 @@ function walk(dir, done) {
 
 /*
  * options: {
- * 	path: , //Path to jasperreports-x.x.x-project directory - required
+ * 	path: , //Path to jasperreports-x.x.x-project library directory - required
  * 	reports: {
  * 		//Report Definition
- * 		name: { //Report's name
- * 			jasper: , //Path to jasper file,
- * 			jrxml: //Path to jrxml file
+ * 		name: { //Report's name - required
+ * 			jasper: , //Path to jasper file - require one of either jasper or jrxml,
+ * 			jrxml: //Path to jrxml file - require one of either jasper or jrxml
  * 		}
- * 	},
- *  tmpPath: '/tmp', // Path to a folder for storing compiled report files, default is used if not provided
+ * 	}
  * }
  */
 function jasper(options) {
@@ -94,12 +93,6 @@ function jasper(options) {
 			if(!options.debug) options.debug = 'off';
 			var levels = ['ALL', 'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'OFF'];
 			if(levels.indexOf((options.debug+'').toUpperCase()) == -1) options.debug = 'DEBUG';
-			// Multi type export support - nandakho
-			self.SimpleExporterInput = java.import('net.sf.jasperreports.export.SimpleExporterInput');
-			self.JRXlsxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter');
-			self.JRDocxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRDocxExporter');
-			self.JRPptxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRPptxExporter');
-			self.SimpleOutputStreamExporterOutput = java.import('net.sf.jasperreports.export.SimpleOutputStreamExporterOutput');
 			cb();
 		}],
 		loadClass: ['loadJars', function(cb) {
@@ -115,6 +108,13 @@ function jasper(options) {
 			self.jfm = java.import('net.sf.jasperreports.engine.JasperFillManager');
 			self.jem = java.import('net.sf.jasperreports.engine.JasperExportManager');
 			self.loc = java.import('java.util.Locale');
+			// Multi type export support - nandakho
+			self.jpm = java.import('net.sf.jasperreports.engine.JasperPrintManager');
+			self.SimpleExporterInput = java.import('net.sf.jasperreports.export.SimpleExporterInput');
+			self.JRXlsxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter');
+			self.JRDocxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRDocxExporter');
+			self.JRPptxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRPptxExporter');
+			self.SimpleOutputStreamExporterOutput = java.import('net.sf.jasperreports.export.SimpleOutputStreamExporterOutput');
 			cb();
 		}]
 	}, function() {
@@ -155,6 +155,10 @@ jasper.prototype.ppt = function(report) {
 
 jasper.prototype.pdf = function(report) {
 	return this.export(report, 'pdf');
+}
+
+jasper.prototype.print = function(report) {
+	return this.export(report, 'print');
 }
 
 /*	
@@ -226,7 +230,7 @@ jasper.prototype.export = function(report, type) {
 	var prints = [];
 	reports.forEach(function(item) {
 		if(!item.jasper && item.jrxml) {
-			item.jasper = self.compileSync(item.jrxml, self.tmpPath);
+			item.jasper = self.compileSync(item.jrxml);
 		}
 		if(item.jasper) {
 			var data = null;
@@ -256,6 +260,12 @@ jasper.prototype.export = function(report, type) {
 		// Multi type export support - nandakho
 		var tempName = temp.path({suffix: '.tmp'});
 		switch(type){
+			case 'Print':
+				try {
+					return self.jpm.printReportSync(master,true);
+				} catch (err) {
+					return false;
+				}
 			case 'Html':
 				self.jem['exportReportToHtmlFileSync'](master, tempName);
 				var exp = fs.readFileSync(tempName);
@@ -293,38 +303,33 @@ jasper.prototype.export = function(report, type) {
 
 /*
  * compiles all reports added to the reports definition collection with a jrxml file specified
- *
- * dstFolder = destination folder path where the compiled report files will be placed. If not specified, will use the options tmpPath or the defaults tmpPath value.
- *
+ * jasper file will be created on the same directory as the jrxml file
  */
-jasper.prototype.compileAllSync = function (dstFolder) {
+jasper.prototype.compileAllSync = function () {
 	var self = this;
     for (var name in self.reports) {
         var report = self.reports[name];
         if (report.jrxml) {
-            report.jasper = self.compileSync(report.jrxml, dstFolder || self.tmpPath);
+            report.jasper = self.compileSync(report.jrxml);
         }
 	}
 }
 
 /*
  * compiles a jrxml report file to a jasper file with the same name
- *
- * dstFolder = destination folder path where the compiled report files will be placed. If not specified, will use the options tmpPath or the defaults tmpPath value.
- *
+ * jasper file will be created on the same directory as jrxml file
  * returns the full path of the created jasper file
- *
  */
-jasper.prototype.compileSync = function (jrxmlFile, dstFolder) {
+jasper.prototype.compileSync = function (jrxmlFile) {
 	var self = this;
     var name = path.basename(jrxmlFile, '.jrxml');
-    var file = path.join(dstFolder || self.tmpPath, name + '.jasper');
-    java.callStaticMethodSync(
-        "net.sf.jasperreports.engine.JasperCompileManager",
-        "compileReportToFile",
-        path.resolve(self.parentPath, jrxmlFile), file
-    );
-    return file;
+    var file = path.join(path.dirname(path.resolve(self.parentPath, jrxmlFile)),name+'.jasper');
+	try {
+		self.jcm.compileReportToFileSync(path.resolve(self.parentPath, jrxmlFile),file);
+		return file;
+	} catch (error) {
+		return file;
+	}
 };
 
 jasper.prototype.toJsonDataSource = function (dataset,query) {

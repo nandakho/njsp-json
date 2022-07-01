@@ -1,14 +1,15 @@
 # njsp-json
 
 Based on Node-Jasper project,
-simplified to generate report from JSON data only.
+simplified to generate report from JSON data source only.
+Supported output type: pdf, xls, doc, ppt, and printer.
 
 ## Install
 
 Install via npm:
 
 ```
-npm install --save njsp-json
+npm install njsp-json
 ```
 
 To use it inside your project just do:
@@ -28,8 +29,7 @@ options: {
  			jasper: , //Path to jasper file,
  			jrxml: //Path to jrxml file
  		}
- 	},
-	tmpPath: '/tmp', // Path to a folder for storing compiled report files, default is used if not provided
+ 	}
  }
  ```
 
@@ -64,6 +64,16 @@ options: {
 * **pdf(report)**
 
   Alias for _export(report, 'pdf')_
+
+* **print(report)**
+
+  Alias for _export(report, 'print')_
+  Returns boolean _true_ on print success, and boolean _false_ on print fail / canceled
+
+* **compileSync(jrxmlpath)**
+
+  Compile jrxml file in the path given to jasper file in the same directory
+  Returns _full path_ of the created jasper file
 
 * **export(report, format)**
 
