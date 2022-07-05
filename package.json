@@ -1,6 +1,6 @@
 {
   "name": "njsp-json",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "JSON to Jasper Report (Multi Output)",
   "main": "index.js",
   "scripts": {
