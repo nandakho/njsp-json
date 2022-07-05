@@ -21,8 +21,8 @@ var jasper = require('njsp-json')(options);
 Where _options_ is an object with the following signature:
 
 ```
-options: {
-	path: , //Path to jasperreports-x.x.x directory (from jasperreports-x.x.x-project.tar.gz)
+options: { //Optional
+ 	path: , //Path to jasperreports library directory - provide only if using other version
 	reports: {
  		// Report Definition
  		name: { //Report's name
