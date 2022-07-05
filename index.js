@@ -32,8 +32,8 @@ function walk(dir, done) {
 };
 
 /*
- * options: {
- * 	path: , //Path to jasperreports-x.x.x-project library directory - required
+ * options: { //Optional
+ * 	path: , //Path to jasperreports library directory - provide only if using other version
  * 	reports: {
  * 		//Report Definition
  * 		name: { //Report's name - required
@@ -43,12 +43,17 @@ function walk(dir, done) {
  * 	}
  * }
  */
-function jasper(options) {
+function jasper(options=false) {
 	java = require('el-java');
 	this.java = java;
 	var self = this;
 	self.parentPath = path.dirname(module.parent.filename);
-	var jrPath = path.resolve(self.parentPath, options.path||'.');
+	self.libPath = path.dirname(__filename);
+	var jrPath = path.resolve(self.libPath);
+	if(options.path){
+		self.libPath = self.parentPath;
+		jrPath = path.resolve(self.libPath, options.path);
+	}
 	async.auto({
 		jrJars: function(cb) {
 			if(fs.statSync(path.join(jrPath, 'lib')).isDirectory() && fs.statSync(path.join(jrPath, 'dist')).isDirectory()) {
