@@ -33,12 +33,13 @@ function walk(dir, done) {
 
 /*
  * options: { //Optional
- * 	path: , //Path to jasperreports library directory - provide only if using other version
+ * 	path: '', //Path to jasperreports library directory - provide only if using other version
+ *  font: '', //Path to font extensions library - provide dir containing all font extension jars used
  * 	reports: {
  * 		//Report Definition
  * 		name: { //Report's name - required
- * 			jasper: , //Path to jasper file - require one of either jasper or jrxml,
- * 			jrxml: //Path to jrxml file - require one of either jasper or jrxml
+ * 			jasper: '', //Path to jasper file - require either jasper, jrxml, or both
+ * 			jrxml: '' //Path to jasper file - require either jasper, jrxml, or both
  * 		}
  * 	}
  * }
@@ -50,9 +51,15 @@ function jasper(options=false) {
 	self.parentPath = path.dirname(module.parent.filename);
 	self.libPath = path.dirname(__filename);
 	var jrPath = path.resolve(self.libPath);
+	var fontExtension = false;
+	var fontPath = path.resolve(self.parentPath);
 	if(options.path){
 		self.libPath = self.parentPath;
 		jrPath = path.resolve(self.libPath, options.path);
+	}
+	if(options.font){
+		fontExtension = true;
+		fontPath = path.resolve(self.parentPath, options.font);
 	}
 	async.auto({
 		jrJars: function(cb) {
@@ -82,14 +89,37 @@ function jasper(options=false) {
 				});
 			}
 		},
-		dirverJars: function(cb) {
-			var results = [];
-			cb(null, results);
+		fontJars: function(cb) {
+			if(fontExtension && fs.statSync(fontPath).isDirectory()) {
+				async.parallel([
+					function(cb) {
+						walk(fontPath, function(err, results) {
+							cb(err, results);
+						});
+					},
+				], function(err, results) {
+					if(err) return cb(err);
+					var r = results.shift();
+					results.forEach(function(item) {
+						r = r.concat(item);
+					});
+					cb(null, r);
+				})
+			} else {
+				walk(fontPath, function(err, results) {
+					cb(err, results);
+				});
+			}
 		},
-		loadJars: ['jrJars', 'dirverJars', function(cb, jars) {
-			jars.jrJars.concat(jars.dirverJars).forEach(function(file) {
+		loadJars: ['jrJars', 'fontJars', function(cb, jars) {
+			jars.jrJars.forEach(function(file) {
 				if(path.extname(file) == '.jar') {
-					java.classpath.push(file)
+					java.classpath.push(file);
+				}
+			});
+			jars.fontJars.forEach(function(file) {
+				if(path.extname(file) == '.jar') {
+					java.classpath.push(file);
 				}
 			});
 			cb();
@@ -279,7 +309,7 @@ jasper.prototype.export = function(report, type) {
 			case 'Ppt':
 			case 'Pptx':
 				var exporter = new self.JRPptxExporter();
-				break
+				break;
 			case 'Doc':
 			case 'Docx':
 				var exporter = new self.JRDocxExporter();
@@ -287,7 +317,7 @@ jasper.prototype.export = function(report, type) {
 			case 'Xls':
 			case 'Xlsx':
 				var exporter = new self.JRXlsxExporter();
-				break
+				break;
 			case 'Pdf':
 				self.jem['exportReportToPdfFileSync'](master, tempName);
 				var exp = fs.readFileSync(tempName);

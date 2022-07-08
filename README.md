@@ -22,14 +22,15 @@ Where _options_ is an object with the following signature:
 
 ```
 options: { //Optional
- 	path: , //Path to jasperreports library directory - provide only if using other version
-	reports: {
- 		// Report Definition
- 		name: { //Report's name
- 			jasper: , //Path to jasper file,
- 			jrxml: //Path to jrxml file
- 		}
- 	}
+ * 	path: '', //Path to jasperreports library directory - provide only if using other version
+ *  font: '', //Path to font extensions library - provide dir containing all font extension jars used
+ * 	reports: {
+ * 		// Report Definition
+ * 		name: { //Report's name - required
+ * 			jasper: '', //Path to jasper file - require either jasper, jrxml, or both
+ * 			jrxml: '' //Path to jrxml file - require either jasper, jrxml, or both
+ * 		}
+ * 	}
  }
  ```
 
