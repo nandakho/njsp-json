@@ -154,7 +154,7 @@ function jasper(options=false) {
 		}]
 	}, function() {
 	    if(self.ready) {
-	        self.ready();
+	        self.ready(true);
 	    }
 	});
 
