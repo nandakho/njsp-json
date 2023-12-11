@@ -6,7 +6,7 @@ Supported output type: pdf, xls, doc, ppt, and printer.
 
 ## Install
 
-Install via npm:
+Install via [npm](https://www.npmjs.com/package/njsp-json):
 
 ```
 npm install njsp-json
