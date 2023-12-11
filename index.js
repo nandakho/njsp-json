@@ -146,6 +146,7 @@ function jasper(options=false) {
 			// Multi type export support - nandakho
 			self.jpm = java.import('net.sf.jasperreports.engine.JasperPrintManager');
 			self.SimpleExporterInput = java.import('net.sf.jasperreports.export.SimpleExporterInput');
+			self.SimpleXlsReportConfiguration = java.import('net.sf.jasperreports.export.SimpleXlsReportConfiguration');
 			self.JRXlsxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRXlsxExporter');
 			self.JRDocxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRDocxExporter');
 			self.JRPptxExporter = java.import('net.sf.jasperreports.engine.export.ooxml.JRPptxExporter');
@@ -326,6 +327,11 @@ jasper.prototype.export = function(report, type) {
 			default:
 				return '';
 		}
+		var exporterConfig = new self.SimpleXlsReportConfiguration();
+		exporterConfig.setDetectCellType(true);
+		exporterConfig.setWhitePageBackground(false); 
+		exporter.setConfiguration(exporterConfig);
+		
 		exporter.setExporterInputSync(new self.SimpleExporterInput(master));
 		exporter.setExporterOutputSync(new self.SimpleOutputStreamExporterOutput(tempName));
 		exporter.exportReportSync();
